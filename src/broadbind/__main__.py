@@ -127,21 +127,29 @@ def main():
         reaction["reactionEnergy"] for _, reaction in filtered_reactions.items()
     ]
     element_symbols = get_unique_element_symbols(systems=systems)
-
     element_properties = get_element_properties(
         symbols=element_symbols, properties=pymatgen_element_properties
     )
-    print(element_properties)
 
-    for atoms, energy in zip(systems, energies):
-        data = (
+    dfs = []
+    for i, (atoms, energy) in enumerate(zip(systems, energies)):
+        df = (
             process_system(atoms=atoms, energy=energy)
             .join(other=element_properties, on="symbol", how="inner")
             .select(
                 pl.col(["symbol", "electron_volts"]),
                 pl.exclude(["symbol", "electron_volts"]),
             )
-        )
+        ).with_columns(index=pl.lit(i))
+        dfs.append(df)
+    pl.concat(dfs).write_parquet("data/dataset.parquet")
+
+    dataset = pl.read_parquet(source="data/dataset.parquet")
+    print(dataset)
+
+    # y = data.drop_in_place("electron_volts")[0]
+    # print(y)
+    # break
 
 
 if __name__ == "__main__":
