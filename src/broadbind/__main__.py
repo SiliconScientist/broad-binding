@@ -10,7 +10,20 @@ def get_unique_element_symbols(systems: list[Atoms]):
         symbols = atoms.get_chemical_symbols()
         for symbol in symbols:
             atom_symbols.append(symbol)
-    return set(atom_symbols)
+    return list(set(atom_symbols))
+
+
+def get_element_properties(symbols: list[str], properties: list[str]) -> pl.DataFrame:
+    element_properties = []
+    for symbol in symbols:
+        property_row = {}
+        element = Element(symbol)
+        for property_str in properties:
+            element_property = getattr(element, property_str)
+            property_row[property_str] = element_property
+        element_properties.append(property_row)
+    df = pl.DataFrame(element_properties).with_columns(symbol=pl.Series(symbols))
+    return df
 
 
 def process_system(atoms: Atoms, energy: float) -> pl.DataFrame:
@@ -115,9 +128,20 @@ def main():
     ]
     element_symbols = get_unique_element_symbols(systems=systems)
 
+    element_properties = get_element_properties(
+        symbols=element_symbols, properties=pymatgen_element_properties
+    )
+    print(element_properties)
+
     for atoms, energy in zip(systems, energies):
-        data = process_system(atoms=atoms, energy=energy)
-        print(data)
+        data = (
+            process_system(atoms=atoms, energy=energy)
+            .join(other=element_properties, on="symbol", how="inner")
+            .select(
+                pl.col(["symbol", "electron_volts"]),
+                pl.exclude(["symbol", "electron_volts"]),
+            )
+        )
 
 
 if __name__ == "__main__":
