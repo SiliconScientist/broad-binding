@@ -4,22 +4,20 @@ from pymatgen.core.periodic_table import Element
 from ase.atoms import Atoms
 
 
-def build_vocabulary(systems: list[Atoms]):
+def get_unique_element_symbols(systems: list[Atoms]):
     atom_symbols = []
     for atoms in systems:
-        symbols = atoms.get_symbols()
-        unique_symbols = set(symbols)
-        atom_symbols.append(unique_symbols)
+        symbols = atoms.get_chemical_symbols()
+        for symbol in symbols:
+            atom_symbols.append(symbol)
     return set(atom_symbols)
 
 
-def process_reaction(key: str, reaction: dict) -> pl.DataFrame:
-    system = reaction["reactionSystems"]
-    atoms = system[key]
+def process_system(atoms: Atoms, energy: float) -> pl.DataFrame:
     positions = atoms.get_positions()
     symbols = atoms.get_chemical_symbols()
     df = pl.DataFrame(positions, schema=["x", "y", "z"]).with_columns(
-        electron_volts=pl.lit(reaction["reactionEnergy"]), symbol=pl.Series(symbols)
+        electron_volts=pl.lit(energy), symbol=pl.Series(symbols)
     )
     print(df)
     return df
@@ -109,8 +107,16 @@ def main():
         smol_reactions = pickle.load(f)
 
     filtered_reactions = filter_reactions(reactions=smol_reactions, products=products)
-    for key, reaction in filtered_reactions.items():
-        data = process_reaction(key=key, reaction=reaction)
+    systems = [
+        reaction["reactionSystems"][key] for key, reaction in filtered_reactions.items()
+    ]
+    energies = [
+        reaction["reactionEnergy"] for _, reaction in filtered_reactions.items()
+    ]
+    element_symbols = get_unique_element_symbols(systems=systems)
+
+    for atoms, energy in zip(systems, energies):
+        data = process_system(atoms=atoms, energy=energy)
         print(data)
 
 
