@@ -36,15 +36,17 @@ def process_system(atoms: Atoms, energy: float) -> pl.DataFrame:
     return df
 
 
-def filter_reactions(reactions: list[dict], products: list[str]) -> dict[dict]:
+def filter_reactions(reactions: list[dict], products: list[str]) -> list[dict]:
     """
     Filter out any reaction not specified in the products lists
     """
-    filtered_reactions = {}
+    filtered_reactions = []
     for reaction in reactions:
-        for key in reaction["reactionSystems"]:
-            if key in products:
-                filtered_reactions[key] = reaction
+        reaction_key = next(
+            key for key in reaction["reactionSystems"] if key in products
+        )
+        reaction["reactionSystems"] = reaction["reactionSystems"][reaction_key]
+        filtered_reactions.append(reaction)
     return filtered_reactions
 
 
@@ -120,12 +122,8 @@ def main():
         smol_reactions = pickle.load(f)
 
     filtered_reactions = filter_reactions(reactions=smol_reactions, products=products)
-    systems = [
-        reaction["reactionSystems"][key] for key, reaction in filtered_reactions.items()
-    ]
-    energies = [
-        reaction["reactionEnergy"] for _, reaction in filtered_reactions.items()
-    ]
+    systems = [reaction["reactionSystems"] for reaction in filtered_reactions]
+    energies = [reaction["reactionEnergy"] for reaction in filtered_reactions]
     element_symbols = get_unique_element_symbols(systems=systems)
     element_properties = get_element_properties(
         symbols=element_symbols, properties=pymatgen_element_properties
