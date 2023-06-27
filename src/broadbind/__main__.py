@@ -42,11 +42,10 @@ def filter_reactions(reactions: list[dict], products: list[str]) -> list[dict]:
     """
     filtered_reactions = []
     for reaction in reactions:
-        reaction_key = next(
-            key for key in reaction["reactionSystems"] if key in products
-        )
-        reaction["reactionSystems"] = reaction["reactionSystems"][reaction_key]
-        filtered_reactions.append(reaction)
+        for key in reaction["reactionSystems"]:
+            if key in products:
+                reaction["reactionSystems"] = reaction["reactionSystems"][key]
+                filtered_reactions.append(reaction)
     return filtered_reactions
 
 
