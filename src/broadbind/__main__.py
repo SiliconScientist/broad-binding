@@ -1,7 +1,8 @@
 import pickle
 import toml
 import polars as pl
-import torch
+import numpy as np
+from torch import tensor
 from torch_geometric.data import Data, Dataset
 from torch_geometric.loader import DataLoader
 from pathlib import Path
@@ -18,10 +19,10 @@ class BroadBindDataset(Dataset):
 
     def get(self, idx):
         df = pl.read_parquet(self.path / f"{idx}.parquet")
-        y = df.drop_in_place("electron_volts")[0]
+        y = tensor(df.drop_in_place("electron_volts").to_numpy())[0]
         position_columns = ["x", "y", "z"]
-        x = df.select(pl.exclude(position_columns))
-        pos = df.select(pl.col(position_columns))
+        x = tensor(df.select(pl.exclude(position_columns)).to_numpy())
+        pos = tensor(df.select(pl.col(position_columns)).to_numpy())
         data = Data(x=x, y=y, pos=pos)
         return data
 
