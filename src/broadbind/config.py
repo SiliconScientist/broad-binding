@@ -6,3 +6,4 @@ class Config(BaseModel):
     bound_sites: list[str]
     properties: list[str]
     path: Path
+    batch_size: int
