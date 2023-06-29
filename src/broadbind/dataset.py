@@ -1,6 +1,29 @@
 import polars as pl
 from pymatgen.core.periodic_table import Element
 from ase.atoms import Atoms
+from torch import tensor
+from torch_geometric.data import Data, Dataset
+
+
+class BroadBindDataset(Dataset):
+    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
+        super().__init__(root, transform, pre_transform, pre_filter)
+
+    def len(self):
+        return len(list(self.root.glob("*")))
+
+    def get(self, idx):
+        df = pl.read_parquet(self.root / f"{idx}.parquet")
+        y = (
+            tensor([df.drop_in_place("electron_volts").to_numpy()[0]])
+            .float()
+            .unsqueeze(dim=1)
+        )
+        position_columns = ["x", "y", "z"]
+        x = tensor(df.select(pl.exclude(position_columns)).to_numpy()).float()
+        pos = tensor(df.select(pl.col(position_columns)).to_numpy()).float()
+        data = Data(x=x, y=y, pos=pos)
+        return data
 
 
 def get_unique_element_symbols(systems: list[Atoms]):
