@@ -1,19 +1,36 @@
-from torch.nn import Module, Linear, ReLU, Sequential
-from torch_geometric.nn import PointTransformerConv, knn_graph
+from torch.nn import Module, Linear, ReLU, Sequential, Dropout
+from torch.nn.functional import dropout
+from torch_geometric.nn import XConv, knn_graph, global_mean_pool
 
 
 class GNN(Module):
     def __init__(
-        self, input_dimension, hidden_dimension, output_dimension, k_neighbors
+        self,
+        input_dimension: int,
+        hidden_dimension: int,
+        output_dimension: int,
+        spatial_dimension: int,
+        k_neighbors: int,
+        hidden_channels: int,
+        dropout_rate: float,
     ) -> None:
         super().__init__()
-        self.k_neighbors = k_neighbors
-        self.graph_conv = PointTransformerConv()
-        self.linear = Linear(in_features=input_dimension, out_features=hidden_dimension)
+        self.conv = XConv(
+            in_channels=input_dimension,
+            out_channels=hidden_dimension,
+            dim=spatial_dimension,
+            kernel_size=k_neighbors,
+            hidden_channels=hidden_channels,
+        )
+        self.relu = ReLU()
+        self.linear = Linear(
+            in_features=hidden_dimension, out_features=output_dimension
+        )
+        self.dropout = Dropout(p=dropout_rate)
 
     def forward(self, data):
-        edge_index = knn_graph(
-            data.pos, k=self.k_neighbors, batch=data.batch, loop=True
-        )
-        representation = self.graph_conv(x=data.x, pos=data.pos, edge_index=edge_index)
-        return self.linear(representation)
+        # TODO try not using sequential
+        x = self.conv(x=data.x, pos=data.pos, batch=data.batch)
+        x = self.relu(x)
+        x = global_mean_pool(x=x, batch=data.batch)
+        return self.linear(x)
