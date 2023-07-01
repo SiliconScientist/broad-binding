@@ -35,7 +35,7 @@ def get_unique_element_symbols(systems: list[Atoms]):
     return list(set(atom_symbols))
 
 
-def get_element_properties(symbols: list[str], properties: list[str]) -> pl.DataFrame:
+def get_element_properties(symbols: list[str], properties: list[str]) -> pl.LazyFrame:
     element_properties = []
     for symbol in symbols:
         property_row = {}
@@ -44,17 +44,16 @@ def get_element_properties(symbols: list[str], properties: list[str]) -> pl.Data
             element_property = getattr(element, property_str)
             property_row[property_str] = element_property
         element_properties.append(property_row)
-    df = pl.DataFrame(element_properties).with_columns(symbol=pl.Series(symbols))
+    df = pl.LazyFrame(element_properties).with_columns(symbol=pl.Series(symbols))
     return df
 
 
-def process_system(atoms: Atoms, energy: float) -> pl.DataFrame:
+def process_system(atoms: Atoms, energy: float) -> pl.LazyFrame:
     positions = atoms.get_positions()
     symbols = atoms.get_chemical_symbols()
-    df = pl.DataFrame(positions, schema=["x", "y", "z"]).with_columns(
+    return pl.LazyFrame(positions, schema=["x", "y", "z"]).with_columns(
         electron_volts=pl.lit(energy), symbol=pl.Series(symbols)
     )
-    return df
 
 
 def filter_reactions(reactions: list[dict], bound_sites: list[str]) -> list[dict]:
@@ -82,13 +81,13 @@ def make_dataframe(
     )
     dfs = []
     for i, (atoms, energy) in enumerate(zip(systems, energies)):
-        df = (
-            process_system(atoms=atoms, energy=energy)
-            .join(other=element_properties, on="symbol", how="inner")
-            .select(
-                pl.col(["symbol", "electron_volts"]),
-                pl.exclude(["symbol", "electron_volts"]),
-            )
-        ).with_columns(index=pl.lit(i))
+        df = process_system(atoms=atoms, energy=energy).with_columns(index=pl.lit(i))
         dfs.append(df)
-    return pl.concat(dfs)
+    return (
+        pl.concat(dfs)
+        .join(other=element_properties, on="symbol", how="inner")
+        .select(
+            pl.col(["symbol", "electron_volts"]),
+            pl.exclude(["symbol", "electron_volts"]),
+        )
+    ).collect()

@@ -1,6 +1,5 @@
-from torch.nn import Module, Linear, ReLU, Sequential, Dropout
-from torch.nn.functional import dropout
-from torch_geometric.nn import XConv, knn_graph, global_mean_pool
+from torch.nn import Module, Linear, ReLU, Dropout
+from torch_geometric.nn import XConv, global_mean_pool
 
 
 class GNN(Module):
