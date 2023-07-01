@@ -18,6 +18,6 @@ class Training(BaseModel):
 class Config(BaseModel):
     bound_sites: list[str]
     properties: list[str]
-    path: Path
+    dataset_path: Path
     training: Training
     model: Model

@@ -3,24 +3,35 @@ from pymatgen.core.periodic_table import Element
 from ase.atoms import Atoms
 from torch import tensor
 from torch_geometric.data import Data, Dataset
+from tqdm import tqdm
+from pathlib import Path
 
 
 class BroadBindDataset(Dataset):
-    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
+    def __init__(
+        self,
+        root,
+        transform=None,
+        pre_transform=None,
+        pre_filter=None,
+    ):
         super().__init__(root, transform, pre_transform, pre_filter)
+        self.root = Path(root)
+        self.data = pl.read_parquet(source=self.root).partition_by("index")
 
     def len(self):
-        return len(list(self.root.glob("*")))
+        return len(self.data)
 
     def get(self, idx):
-        df = pl.read_parquet(self.root / f"{idx}.parquet")
+        df = self.data[idx]
         y = (
             tensor([df.drop_in_place("electron_volts").to_numpy()[0]])
             .float()
             .unsqueeze(dim=1)
         )
         position_columns = ["x", "y", "z"]
-        x = tensor(df.select(pl.exclude(position_columns)).to_numpy()).float()
+        columns_to_exclude = position_columns + ["index", "symbol"]
+        x = tensor(df.select(pl.exclude(columns_to_exclude)).to_numpy()).float()
         pos = tensor(df.select(pl.col(position_columns)).to_numpy()).float()
         data = Data(x=x, y=y, pos=pos)
         return data
@@ -56,31 +67,34 @@ def process_system(atoms: Atoms, energy: float) -> pl.LazyFrame:
     )
 
 
-def filter_reactions(reactions: list[dict], bound_sites: list[str]) -> list[dict]:
+def filter_reactions(
+    reactions: list[dict], bound_sites: list[str]
+) -> tuple[list[Atoms], list[float]]:
     """
     Filter out any reaction not specified in the products lists
     """
-    filtered_reactions = []
-    for reaction in reactions:
+    systems = []
+    energies = []
+    for reaction in tqdm(reactions, desc="filter_reactions"):
         for key in reaction["reactionSystems"]:
             if key in bound_sites:
-                reaction["reactionSystems"] = reaction["reactionSystems"][key]
-                filtered_reactions.append(reaction)
-    return filtered_reactions
+                systems.append(reaction["reactionSystems"][key])
+                energies.append(reaction["reactionEnergy"])
+    return systems, energies
 
 
 def make_dataframe(
     reactions: list[dict], bound_sites: list[str], properties: list[str]
 ) -> pl.DataFrame:
-    filtered_reactions = filter_reactions(reactions=reactions, bound_sites=bound_sites)
-    systems = [reaction["reactionSystems"] for reaction in filtered_reactions]
-    energies = [reaction["reactionEnergy"] for reaction in filtered_reactions]
+    systems, energies = filter_reactions(reactions=reactions, bound_sites=bound_sites)
     element_symbols = get_unique_element_symbols(systems=systems)
     element_properties = get_element_properties(
         symbols=element_symbols, properties=properties
     )
     dfs = []
-    for i, (atoms, energy) in enumerate(zip(systems, energies)):
+    for i, (atoms, energy) in tqdm(
+        enumerate(zip(systems, energies)), total=len(systems)
+    ):
         df = process_system(atoms=atoms, energy=energy).with_columns(index=pl.lit(i))
         dfs.append(df)
     return (

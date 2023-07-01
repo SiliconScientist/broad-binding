@@ -11,20 +11,17 @@ from broadbind.model import GNN
 
 def main():
     config = Config(**toml.load("config.toml"))
-    with open("data/temp.pickle", "rb") as f:
-        smol_reactions = pickle.load(f)
-    big_df = make_dataframe(
-        reactions=smol_reactions,
-        bound_sites=config.bound_sites,
-        properties=config.properties,
-    )
-    big_df.write_parquet("data/dataset.parquet")
-    data = pl.read_parquet(source="data/dataset.parquet")
-    for name, df in data.groupby("index"):
-        df = df.select(pl.exclude(["symbol", "index"]))
-        df.write_parquet(f"data/dataset/{name}.parquet")
-
-    dataset = BroadBindDataset(root=config.path)
+    if not config.dataset_path.is_file():
+        with open("data/reactions.pkl", "rb") as f:
+            reactions = pickle.load(f)
+        df = make_dataframe(
+            reactions=reactions,
+            bound_sites=config.bound_sites,
+            properties=config.properties,
+        )
+        print(df.estimated_size(unit="gb"))
+        df.write_parquet(config.dataset_path)
+    dataset = BroadBindDataset(root=config.dataset_path)
     loader = DataLoader(
         dataset=dataset, batch_size=config.training.batch_size, shuffle=True
     )
