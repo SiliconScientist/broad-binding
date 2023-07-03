@@ -5,6 +5,10 @@ from torch import tensor
 from torch_geometric.data import Data, Dataset
 from tqdm import tqdm
 from pathlib import Path
+from lightning import LightningDataModule
+from torch_geometric.loader import DataLoader
+from multiprocessing import cpu_count
+from sklearn.model_selection import train_test_split
 
 
 class BroadBindDataset(Dataset):
@@ -35,6 +39,51 @@ class BroadBindDataset(Dataset):
         pos = tensor(df.select(pl.col(position_columns)).to_numpy()).float()
         data = Data(x=x, y=y, pos=pos)
         return data
+
+
+class BroadBindDataModule(LightningDataModule):
+    def __init__(
+        self, train: Path, validation: Path, test: Path, batch_size: int
+    ) -> None:
+        super().__init__()
+        self.train_dataset = BroadBindDataset(root=train)
+        self.val_dataset = BroadBindDataset(root=validation)
+        self.test_dataset = BroadBindDataset(root=test)
+        self.batch_size = batch_size
+        self.num_workers = cpu_count()
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+
+def split_train_val_test(
+    data: pl.DataFrame,
+    random_seed: int,
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    train, test = train_test_split(data, train_size=0.8, random_state=random_seed)
+    test, validation = train_test_split(test, train_size=0.5, random_state=random_seed)
+    return train, validation, test
 
 
 def get_unique_element_symbols(systems: list[Atoms]):

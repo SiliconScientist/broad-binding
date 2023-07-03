@@ -13,11 +13,20 @@ class Training(BaseModel):
     batch_size: int
     max_epoch: int
     learning_rate: float
+    decay_period: int
+
+
+class Paths(BaseModel):
+    train: Path
+    validation: Path
+    test: Path
 
 
 class Config(BaseModel):
+    random_seed: int
     bound_sites: list[str]
     properties: list[str]
     dataset_path: Path
     training: Training
     model: Model
+    paths: Paths
