@@ -51,7 +51,7 @@ class BroadBindNetwork(LightningModule):
         self.criterion = criterion
         self.scheduler_config = scheduler_config
 
-    def step(self, batch, step_type):
+    def step(self, batch, step_type: str):
         predictions = self.model(batch)
         loss = self.criterion(predictions, batch.y)
         self.log(f"{step_type}_loss", loss, prog_bar=True)

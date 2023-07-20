@@ -1,17 +1,16 @@
 import pickle
 import toml
-import polars as pl
 from torch.optim import SGD
 from torch.nn import MSELoss
 from torch.optim.lr_scheduler import StepLR
 from lightning import seed_everything, Trainer
-from pytorch_lightning.callbacks import (
+from lightning.pytorch.callbacks import (
     ModelCheckpoint,
-    RichProgressBar,
+    # RichProgressBar,
+    TQDMProgressBar,
     LearningRateMonitor,
 )
-from pytorch_lightning.loggers import TensorBoardLogger
-
+from lightning.pytorch.loggers import TensorBoardLogger
 from broadbind.config import Config
 from broadbind.dataset import make_dataframe, split_train_val_test
 from broadbind.model import GNN
@@ -22,7 +21,7 @@ from broadbind.model import BroadBindNetwork
 def main():
     config = Config(**toml.load("config.toml"))
     seed_everything(config.random_seed)
-    if not all(file.is_file() for file in config.paths.dict().values()):
+    if not config.paths.train.is_file():
         with open("data/reactions.pkl", "rb") as f:
             reactions = pickle.load(f)
         df = make_dataframe(
@@ -48,7 +47,9 @@ def main():
     criterion = MSELoss()
 
     data_module = BroadBindDataModule(
-        **config.paths.dict(),
+        train=config.paths.train,
+        validation=config.paths.validation,
+        test=config.paths.test,
         batch_size=config.training.batch_size,
     )
     scheduler = StepLR(
@@ -68,35 +69,36 @@ def main():
     )
     checkpoint_callback = ModelCheckpoint(
         dirpath=config.paths.checkpoints,
-        filename="{epoch}_{step}_{train_loss:.2f}",
+        filename="{epoch}_{step}_{val_loss:.2f}",
         save_top_k=1,
         verbose=True,
-        monitor="train_loss",
+        monitor="val_loss",
         mode="min",
         every_n_train_steps=config.logging.checkpoint_every_n_steps,
     )
     logger = TensorBoardLogger(
         config.paths.logs,
-        name="embeddings",
+        name="neural_network",
     )
-    lr_logger = LearningRateMonitor(logging_interval="step", log_momentum=True)
+    lr_logger = LearningRateMonitor(logging_interval="step")
     callbacks = [
         checkpoint_callback,
         lr_logger,
-        RichProgressBar(),
+        TQDMProgressBar(),
     ]
     trainer = Trainer(
         logger=logger,
         callbacks=callbacks,
         gradient_clip_val=config.training.gradient_clip,
         max_epochs=config.training.max_epochs,
-        accelerator="auto",
+        accelerator="cpu",
         devices="auto",
         log_every_n_steps=config.logging.log_every_n_steps,
         fast_dev_run=config.fast_dev_run,
+        # num_sanity_val_steps=0,
     )
     trainer.fit(
-        ehr2vec,
+        network,
         datamodule=data_module,
         # ckpt_path="",
     )
