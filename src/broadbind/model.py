@@ -14,7 +14,7 @@ class GNN(Module):
         spatial_dimension: int,
         k_neighbors: int,
         hidden_channels: int,
-        dropout_rate: float,
+        # dropout_rate: float,
     ) -> None:
         super().__init__()
         self.conv = XConv(
@@ -28,7 +28,7 @@ class GNN(Module):
         self.linear = Linear(
             in_features=hidden_dimension, out_features=output_dimension
         )
-        self.dropout = Dropout(p=dropout_rate)
+        # self.dropout = Dropout(p=dropout_rate)
 
     def forward(self, data):
         x = self.conv(x=data.x, pos=data.pos, batch=data.batch)

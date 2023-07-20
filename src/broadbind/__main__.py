@@ -6,8 +6,7 @@ from torch.optim.lr_scheduler import StepLR
 from lightning import seed_everything, Trainer
 from lightning.pytorch.callbacks import (
     ModelCheckpoint,
-    # RichProgressBar,
-    TQDMProgressBar,
+    RichProgressBar,
     LearningRateMonitor,
 )
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -31,7 +30,7 @@ def main():
         )
         print(df.estimated_size(unit="gb"))
         train, validation, test = split_train_val_test(
-            df, random_seed=config.random_seed
+            df.partition_by("index"), random_seed=config.random_seed
         )
         train.write_parquet(config.paths.train)
         validation.write_parquet(config.paths.validation)
@@ -84,7 +83,7 @@ def main():
     callbacks = [
         checkpoint_callback,
         lr_logger,
-        TQDMProgressBar(),
+        RichProgressBar(),
     ]
     trainer = Trainer(
         logger=logger,

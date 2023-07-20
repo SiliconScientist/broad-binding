@@ -58,6 +58,7 @@ class BroadBindDataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
+            drop_last=True,
         )
 
     def val_dataloader(self):
@@ -78,12 +79,12 @@ class BroadBindDataModule(LightningDataModule):
 
 
 def split_train_val_test(
-    data: pl.DataFrame,
+    data: list[pl.DataFrame],
     random_seed: int,
 ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     train, test = train_test_split(data, train_size=0.8, random_state=random_seed)
     test, validation = train_test_split(test, train_size=0.5, random_state=random_seed)
-    return train, validation, test
+    return pl.concat(train), pl.concat(validation), pl.concat(test)
 
 
 def get_unique_element_symbols(systems: list[Atoms]):
