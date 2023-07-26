@@ -1,5 +1,6 @@
 import pickle
 import toml
+import time
 from torch.optim import SGD
 from torch.nn import MSELoss
 from torch.optim.lr_scheduler import StepLR
@@ -96,11 +97,14 @@ def main():
         fast_dev_run=config.fast_dev_run,
         # num_sanity_val_steps=0,
     )
+    start = time.time()
     trainer.fit(
         network,
         datamodule=data_module,
         # ckpt_path="",
     )
+    end = time.time()
+    print("time:", end - start)
 
 
 if __name__ == "__main__":
